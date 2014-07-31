@@ -1,0 +1,10 @@
+requirements:
+  - pyzmq
+  - m2crypto
+
+---
+profile: development
+
+requirements:
+  - ipython
+  - nose
