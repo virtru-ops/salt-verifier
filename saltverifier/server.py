@@ -25,6 +25,8 @@ import hashlib
 import zmq
 import M2Crypto
 import logging
+import pwd
+
 # Setup the logging to be json
 logging.basicConfig(
     format='{"message": "%(message)s", "level": "%(levelname)s", timestamp: "%(asctime)s"}',
@@ -37,6 +39,7 @@ DESCRIPTION = 'A simple challenge response server for this salt minions key'
 parser = argparse.ArgumentParser(description=DESCRIPTION)
 parser.add_argument('--port', type=int, default=4533,
                     help='Port to run the server')
+parser.add_argument('--run-as', help='Username to run process as')
 parser.add_argument('--private-key-path', default='/etc/salt/pki/minion/minion.pem',
                     help="The path to the minion's key")
 
@@ -52,7 +55,6 @@ class ChallengeResponseServer():
             self._server_loop()
         except KeyboardInterrupt:
             logging.info('Shutting down salt-verifier challenge response server')
-            pass
 
     def _server_loop(self):
         context = zmq.Context()
@@ -112,7 +114,18 @@ def run(args=None):
         sys.stderr.write('No private key exists at %s\n' % private_key_path)
         return sys.exit(1)
 
+    # Load the private key
     private_key = M2Crypto.RSA.load_key(private_key_path)
+
+    # Downgrade user to the setuid if --run-as is set on command line
+    run_as = parsed_args.run_as
+    if run_as:
+        try:
+            passwd = pwd.getpwnam(run_as)
+        except KeyError:
+            logging.error('No user called %s. Exiting' % run_as)
+            return
+        os.setuid(passwd.pw_uid)
 
     server = ChallengeResponseServer(port, private_key)
     server.serve()
