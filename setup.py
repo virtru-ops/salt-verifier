@@ -11,8 +11,8 @@ setup(
     long_description=LONG_DESCRIPTION,
     keywords='',
     author='Reuven V. Gonzales',
-    author_email='reuven@tobetter.us',
-    url="https://github.com/ravenac95/salt-verifier",
+    author_email='reuven@virtru.com',
+    url="https://github.com/virtru-ops/salt-verifier",
     license='MIT',
     platforms='*nix',
     packages=find_packages(exclude=['ez_setup', 'examples', 'tests']),
@@ -25,6 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'salt-verifier-server=saltverifier.server:run',
+            'salt-verifier-server-upstart-script=saltverifier.upstart:generate_upstart_script',
         ],
     },
     classifiers=[
