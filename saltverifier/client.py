@@ -36,16 +36,26 @@ def make_zmq_request(socket, message, request_timeout=DEFAULT_REQUEST_TIMEOUT,
     return socket.recv()
 
 
-def is_valid_server_public_key(address, public_key_str):
+def is_valid_server_public_key(address, public_key_str,
+                               connection_timeout=None,
+                               request_timeout=None):
     context = zmq.Context()
     try:
-        result = _is_valid_server_public_key(context, address, public_key_str)
+        result = _is_valid_server_public_key(
+            context,
+            address,
+            public_key_str,
+            connection_timeout=connection_timeout,
+            request_timeout=request_timeout
+        )
     finally:
         context.destroy(linger=0)
     return result
 
 
-def _is_valid_server_public_key(context, address, public_key_str):
+def _is_valid_server_public_key(context, address, public_key_str,
+                                connection_timeout=None,
+                                request_timeout=None):
     socket = context.socket(zmq.REQ)
 
     public_key_bio = M2Crypto.BIO.MemoryBuffer(public_key_str)
@@ -64,7 +74,9 @@ def _is_valid_server_public_key(context, address, public_key_str):
     encrypted_challenge_message_base64 = encrypted_challenge_message.encode('base64')
 
     # Wait for a response
-    response = make_zmq_request(socket, encrypted_challenge_message_base64)
+    response = make_zmq_request(socket, encrypted_challenge_message_base64,
+                                connection_timeout=connection_timeout,
+                                request_timeout=request_timeout)
 
     # All responses are in the form status;message so split on ';'
     response_split = response.split(';')
