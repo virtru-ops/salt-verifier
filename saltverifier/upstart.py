@@ -10,8 +10,9 @@ parser.add_argument('--private-key-path', help="The path to the minion's key")
 parser.add_argument('--run-as', default='nobody',
                     help='Run as a specific user. Requires root')
 
-UPSTART_TEMPLATE = """
+UPSTART_TEMPLATE = """#
 # Auto-generated file. Please do not edit unless you know what you're doing
+#
 
 description "Salt verifier server"
 
@@ -19,7 +20,9 @@ start on runlevel [2345]
 stop on runlevel [!2345]
 
 respawn
-respawn limit 10 5
+
+# Try to respawn continuously for 15 minutes
+respawn limit 0 900
 
 script
     exec {exec_string}
