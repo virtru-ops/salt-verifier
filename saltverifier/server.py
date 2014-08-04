@@ -42,6 +42,14 @@ parser.add_argument('--port', type=int, default=4533,
 parser.add_argument('--run-as', help='Username to run process as')
 parser.add_argument('--private-key-path', default='/etc/salt/pki/minion/minion.pem',
                     help="The path to the minion's key")
+parser.add_argument('--private-key-load-timeout', default=900.0, type=float,
+                    help="Time in seconds to wait to load the private key")
+parser.add_argument('--private-key-load-interval', default=0.1, type=float,
+                    help="Interval in seconds to check for private key during loading")
+
+
+class PrivateKeyDoesNotExist(Exception):
+    pass
 
 
 class ChallengeResponseServer():
@@ -104,18 +112,50 @@ class ChallengeResponseServer():
         return self._private_key.sign_rsassa_pss(message_digest.digest())
 
 
+def load_private_key(private_key_path, timeout, interval):
+    current_time = time.time()
+    ready = False
+    count = 0
+    while current_time + timeout > time.time():
+        # Report to the logs that we're waiting for the private key... but
+        # don't always do it. It'll get too noisy unnecessarily. With the
+        # default settings this will run every 2 seconds
+        if count % 20 == 0:
+            logging.info('Checking for private key @ "%s"' % private_key_path)
+        if os.path.exists(private_key_path):
+            ready = True
+            break
+        count += 1
+        time.sleep(interval)
+    if not ready:
+        raise PrivateKeyDoesNotExist(
+            'No private key exists @ %s\n' % private_key_path
+        )
+    logging.info('Private key found @ "%s"' % private_key_path)
+
+    # Load the private key
+    private_key = M2Crypto.RSA.load_key(private_key_path)
+    return private_key
+
+
 def run(args=None):
     args = args or sys.argv[1:]
     parsed_args = parser.parse_args(args)
     port = parsed_args.port
     private_key_path = os.path.abspath(parsed_args.private_key_path)
 
-    if not os.path.exists(private_key_path):
-        sys.stderr.write('No private key exists at %s\n' % private_key_path)
-        return sys.exit(1)
-
-    # Load the private key
-    private_key = M2Crypto.RSA.load_key(private_key_path)
+    try:
+        private_key = load_private_key(
+            private_key_path,
+            parsed_args.private_key_load_timeout,
+            parsed_args.private_key_load_interval
+        )
+    except PrivateKeyDoesNotExist, e:
+        logging.info(e.message)
+        sys.exit(1)
+    except KeyboardInterrupt:
+        logging.info('Shutting down. Was waiting for private key.')
+        sys.exit(1)
 
     # Downgrade user to the setuid if --run-as is set on command line
     run_as = parsed_args.run_as
